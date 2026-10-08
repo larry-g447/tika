@@ -123,6 +123,32 @@
 
   <build>
     <plugins>
+      <!-- Plugin pitest rajouté pour tâche2 IFT3913 -->
+      <plugin>
+      
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>1.15.0</version>
+        <configuration>
+            <!-- no longer required -->
+            <targetClasses>
+                <param>org.apache.tika.io.TikaInputStream</param>
+            </targetClasses>
+            <!-- no longer required -->
+            <targetTests>
+                <param>org.apache.tika.io.TikaInputStreamTest</param>
+            </targetTests>
+        </configuration>
+
+        <dependencies>
+         <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>1.2.2</version>
+          </dependency>
+        </dependencies>
+
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
