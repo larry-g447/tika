@@ -1,7 +1,5 @@
 # Tâche 2 – IFT3913 : génération de tests et analyse de mutation sur `TikaInputStream`
 
-## Correspondance avec les critères d'évaluation
-
 ---
 
 ## 1. Classes à tester
