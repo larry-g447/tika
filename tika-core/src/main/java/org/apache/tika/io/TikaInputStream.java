@@ -80,7 +80,7 @@ public class TikaInputStream extends TaggedInputStream {
      * Strategy-based constructor.
      * TikaInputSource extends InputStream, so we pass it directly to super().
      */
-    private TikaInputStream(TikaInputSource inputSource, TemporaryResources tmp, String suffix) {
+    public TikaInputStream(TikaInputSource inputSource, TemporaryResources tmp, String suffix) {
         super((InputStream) inputSource);
         this.tmp = tmp;
         this.suffix = suffix;
@@ -89,7 +89,7 @@ public class TikaInputStream extends TaggedInputStream {
     /**
      * Returns the backing TikaInputSource, or null if using protected constructor.
      */
-    private TikaInputSource inputSource() {
+    public TikaInputSource inputSource() {
         return in instanceof TikaInputSource ? (TikaInputSource) in : null;
     }
 
@@ -254,7 +254,7 @@ public class TikaInputStream extends TaggedInputStream {
         return tis;
     }
 
-    private static String getExtension(Metadata metadata) {
+    public static String getExtension(Metadata metadata) {
         if (metadata == null) {
             return StringUtils.EMPTY;
         }
@@ -425,7 +425,7 @@ public class TikaInputStream extends TaggedInputStream {
         this.position = position;
     }
 
-    private void setLength(long length) {
+    public void setLength(long length) {
         this.overrideLength = length;
     }
 

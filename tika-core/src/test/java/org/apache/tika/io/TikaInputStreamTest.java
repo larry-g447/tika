@@ -16,12 +16,14 @@
  */
 package org.apache.tika.io;
 
+
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,13 +31,17 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Blob;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Random;
 
@@ -49,6 +55,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
+
 
 public class TikaInputStreamTest {
 
@@ -994,5 +1001,261 @@ public class TikaInputStreamTest {
 
     private static String str(byte[] b) {
         return new String(b, UTF_8);
+    }
+
+    // Tests manuels 
+
+    @Test
+    public void testInitialPosition() throws Exception {
+        TikaInputStream tis = TikaInputStream.get(bytes("Test"));
+        assertEquals(0, tis.getPosition());
+        assertTrue(tis.hasLength());
+        tis.close();
+    }
+
+    @Test
+    public void testConsecutiveEOFsLimit() throws Exception {
+        InputStream infiniteEofStream = new InputStream() {
+            @Override
+            public int read() throws IOException {
+                return -1;
+            }
+        };
+        
+        try (TikaInputStream tis = TikaInputStream.get(infiniteEofStream)) {
+            tis.enableRewind();
+            assertThrows(IOException.class, () -> {
+                for (int i = 0; i <= 1005; i++) {
+                    tis.read();
+                }
+            });
+        }
+    }
+
+    @Test
+    public void testCloseShieldMutation() throws Exception {
+        byte[] data = bytes("Shield");
+        try (TikaInputStream tis = TikaInputStream.get(data)) {
+            assertFalse(tis.isCloseShield());
+            tis.setCloseShield();
+            assertTrue(tis.isCloseShield());
+            tis.setCloseShield(); // Profondeur 2
+            
+            tis.removeCloseShield();
+            assertTrue(tis.isCloseShield()); // Toujours protégé (profondeur 1)
+            tis.removeCloseShield();
+            assertFalse(tis.isCloseShield()); // Complètement non protégé
+        }
+    }
+    
+    @Test
+    public void testContainerAndResourcesAndToString() throws Exception {
+        Metadata metadata = new Metadata();
+        java.util.concurrent.atomic.AtomicBoolean containerClosed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.io.Closeable mockContainer = () -> containerClosed.set(true);
+
+        // Tue les mutants des lignes 251-254, 358, 363-364, 396-397, 404-405 et 490-503
+        try (TikaInputStream tis = TikaInputStream.getFromContainer(mockContainer, 42L, metadata)) {
+            assertSame(mockContainer, tis.getOpenContainer());
+            assertTrue(tis.hasLength());
+            assertEquals(42L, tis.getLength());
+            assertEquals("42", metadata.get(Metadata.CONTENT_LENGTH));
+            assertTrue(tis.markSupported()); // Tue le mutant ligne 293
+            assertTrue(tis.toString().contains("in")); // Tue les mutants de toString() lignes 500-503
+        }
+        assertTrue(containerClosed.get());
+
+        // Tue les mutants des lignes 369, 386, 391-392 et 491-493
+        java.util.concurrent.atomic.AtomicBoolean resourceClosed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        try (TikaInputStream tis = TikaInputStream.get(bytes("TestFile"))) {
+            tis.addCloseableResource(() -> resourceClosed.set(true));
+            assertNotNull(tis.getFile());
+            assertTrue(tis.hasFile());
+            assertTrue(tis.toString().contains(tis.getPath().toString()));
+            assertNotNull(tis.getFileChannel());
+        }
+        assertTrue(resourceClosed.get());
+    }
+
+    @Test
+    public void testExactConsecutiveEOFsBoundary() throws Exception {
+        InputStream eofStream = new InputStream() {
+            @Override
+            public int read() {
+                return -1;
+            }
+        };
+        // Tue le mutant "changed conditional boundary" à la ligne 330
+        try (TikaInputStream tis = TikaInputStream.get(eofStream)) {
+            for (int i = 0; i < 1000; i++) {
+                assertEquals(-1, tis.read());
+            }
+            assertThrows(IOException.class, tis::read);
+        }
+    }
+
+    // Tests générés
+
+    private static final int BLOB_THRESHOLD = 1024 * 1024;
+    private static final int MAX_CONSECUTIVE_EOFS = 1000;
+
+    @Test
+    public void getBlob_exactlyAtThreshold_isStillByteArray() throws Exception {
+        byte[] data = new byte[BLOB_THRESHOLD];
+        Arrays.fill(data, (byte) 7);
+        try (TikaInputStream tis = TikaInputStream.get(blob(data), new Metadata())) {
+            assertTrue(tis.inputSource() instanceof ByteArraySource);
+            assertEquals(BLOB_THRESHOLD, tis.getLength());
+        }
+    }
+
+    @Test
+    public void getBlob_aboveThreshold_isStreamedThroughCachingSource() throws Exception {
+        byte[] data = new byte[BLOB_THRESHOLD + 1];
+        Arrays.fill(data, (byte) 9);
+        Metadata metadata = new Metadata();
+        try (TikaInputStream tis = TikaInputStream.get(blob(data), metadata)) {
+            assertEquals(Integer.toString(BLOB_THRESHOLD + 1), metadata.get(Metadata.CONTENT_LENGTH));
+            assertTrue(tis.inputSource() instanceof CachingSource);
+            assertArrayEquals(data, IOUtils.toByteArray(tis));
+        }
+    }
+
+    @Test
+    public void getPath_setsResourceNameAndContentLength_butKeepsExistingName() throws IOException {
+        Path file = tempDir.resolve("named.txt");
+        Files.write(file, bytes("Hello"));
+
+        Metadata metadata = new Metadata();
+        try (TikaInputStream tis = TikaInputStream.get(file, metadata)) {
+            assertEquals("named.txt", metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY));
+            assertEquals("5", metadata.get(Metadata.CONTENT_LENGTH));
+            assertTrue(tis.hasFile());
+        }
+
+        Metadata withName = new Metadata();
+        withName.set(TikaCoreProperties.RESOURCE_NAME_KEY, "custom.bin");
+        TikaInputStream.get(file, withName).close();
+        assertEquals("custom.bin", withName.get(TikaCoreProperties.RESOURCE_NAME_KEY));
+    }
+
+    @Test
+    public void getUriAndUrl_regularFile_areFileBacked() throws Exception {
+        Path file = tempDir.resolve("uri.txt");
+        Files.write(file, bytes("uri content"));
+
+        Metadata uriMetadata = new Metadata();
+        try (TikaInputStream tis = TikaInputStream.get(file.toUri(), uriMetadata)) {
+            assertTrue(tis.hasFile());
+            assertEquals(file, tis.getPath());
+            assertEquals("uri.txt", uriMetadata.get(TikaCoreProperties.RESOURCE_NAME_KEY));
+            assertEquals("uri content", str(IOUtils.toByteArray(tis)));
+        }
+
+        Metadata urlMetadata = new Metadata();
+        try (TikaInputStream tis = TikaInputStream.get(file.toUri().toURL(), urlMetadata)) {
+            assertTrue(tis.hasFile());
+            assertEquals("uri.txt", urlMetadata.get(TikaCoreProperties.RESOURCE_NAME_KEY));
+            assertEquals("uri content", str(IOUtils.toByteArray(tis)));
+        }
+    }
+
+    @Test
+    public void getUriAndUrl_missingFile_throwIOException() throws Exception {
+        java.net.URI missing = tempDir.resolve("does-not-exist.txt").toUri();
+        assertThrows(IOException.class, () -> TikaInputStream.get(missing));
+        assertThrows(IOException.class, () -> TikaInputStream.get(missing.toURL()));
+    }
+
+    @Test
+    public void getLength_streamWithUnknownLength_forcesSpillAndReturnsRealLength() throws IOException {
+        try (TikaInputStream tis = TikaInputStream.get(new ByteArrayInputStream(bytes("Hello, World!")))) {
+            tis.enableRewind();
+            assertFalse(tis.hasLength());
+            assertEquals(13, tis.getLength());
+            assertTrue(tis.hasLength());
+            assertTrue(tis.hasFile());
+        }
+    }
+
+    @Test
+    public void reset_resetsEofCounter() throws IOException {
+        try (TikaInputStream tis = TikaInputStream.get(new byte[0])) {
+            tis.mark(10);
+            for (int i = 0; i < MAX_CONSECUTIVE_EOFS; i++) {
+                assertEquals(-1, tis.read());
+            }
+            tis.reset();
+            assertEquals(-1, tis.read()); // lèverait une IOException sans la remise à zéro
+        }
+    }
+
+    @Test
+    public void rewind_resetsPosition_andInvalidatesMark() throws IOException {
+        try (TikaInputStream tis = TikaInputStream.get(bytes("ABCDEFGHIJ"))) {
+            tis.mark(50);
+            tis.read(new byte[4]);
+            assertEquals(4, tis.getPosition());
+
+            tis.rewind();
+            assertEquals(0, tis.getPosition());
+            assertThrows(IOException.class, tis::reset);
+            assertEquals("ABCDEFGHIJ", str(IOUtils.toByteArray(tis)));
+        }
+    }
+
+    @Test
+    public void closeShield_isReentrant_andProtectsTemporaryFile() throws IOException {
+        TikaInputStream tis = TikaInputStream.get(new ByteArrayInputStream(bytes("Hello")));
+        Path spilled = tis.getPath();
+        assertTrue(Files.exists(spilled));
+
+        assertFalse(tis.isCloseShield());
+        tis.setCloseShield();
+        tis.setCloseShield();
+        assertTrue(tis.isCloseShield());
+        tis.close();
+        assertTrue(Files.exists(spilled));
+
+        tis.removeCloseShield();
+        assertTrue(tis.isCloseShield());
+        tis.close();
+        assertTrue(Files.exists(spilled));
+
+        tis.removeCloseShield();
+        assertFalse(tis.isCloseShield());
+        tis.close();
+        assertFalse(Files.exists(spilled));
+    }
+
+    @Test
+    public void setLength_zeroOverridesUnknownLength() throws IOException {
+        try (TikaInputStream tis = TikaInputStream.get(new ByteArrayInputStream(bytes("Hello")))) {
+            assertFalse(tis.hasLength());
+            tis.setLength(0);
+            assertTrue(tis.hasLength());
+            assertEquals(0, tis.getLength());
+        }
+    }
+
+    // ---------- utilitaires ----------
+
+    private static Blob blob(byte[] data) {
+        InvocationHandler handler = (proxy, method, args) -> {
+            switch (method.getName()) {
+                case "length":
+                    return (long) data.length;
+                case "getBytes": {
+                    int from = (int) ((Long) args[0] - 1);
+                    int len = (Integer) args[1];
+                    return Arrays.copyOfRange(data, from, from + len);
+                }
+                case "getBinaryStream":
+                    return new ByteArrayInputStream(data);
+                default:
+                    throw new UnsupportedOperationException(method.getName());
+            }
+        };
+        return (Blob) Proxy.newProxyInstance(Blob.class.getClassLoader(), new Class<?>[]{Blob.class}, handler);
     }
 }

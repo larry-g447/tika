@@ -119,6 +119,26 @@
       <artifactId>junit-jupiter-engine</artifactId>
       <scope>test</scope>
     </dependency>
+
+    
+    <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+    <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-junit-jupiter</artifactId>
+        <version>5.23.0</version>
+        <scope>test</scope>
+    </dependency>
+
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-params</artifactId>
+        <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -130,11 +150,9 @@
         <artifactId>pitest-maven</artifactId>
         <version>1.15.0</version>
         <configuration>
-            <!-- no longer required -->
             <targetClasses>
                 <param>org.apache.tika.io.TikaInputStream</param>
             </targetClasses>
-            <!-- no longer required -->
             <targetTests>
                 <param>org.apache.tika.io.TikaInputStreamTest</param>
             </targetTests>
@@ -149,6 +167,30 @@
         </dependencies>
 
       </plugin>
+
+      <plugin>
+          <groupId>io.github.zju-aces-ise</groupId>
+          <artifactId>chatunitest-maven-plugin</artifactId>
+          <version>2.1.1</version>
+          <configuration>
+              <apiKeys>NO_API</apiKeys>
+              <model>codeqwen:v1.5-chat</model>
+              <url>http://localhost:11434/v1/chat/completions</url>
+              <selectClass>org.apache.tika.io.TikaInputStream</selectClass>
+              <testNumber>2</testNumber>
+              <maxRounds>2</maxRounds>
+              <thread>false</thread>
+          </configuration>
+          <dependencies>
+              <dependency>
+                  <groupId>io.github.ZJU-ACES-ISE</groupId>
+                  <artifactId>chatunitest-starter</artifactId>
+                  <version>1.4.0</version>
+                  <type>pom</type>
+              </dependency>
+          </dependencies>
+      </plugin>
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
