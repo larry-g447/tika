@@ -19,13 +19,9 @@ name: main jdk17 build
 
 on:
   pull_request:
-    branches: [ main ]
-    paths-ignore:
-      - 'docs/**'
   push:
-    branches: [ main ]
-    paths-ignore:
-      - 'docs/**'
+  workflow_dispatch:
+  
 
 jobs:
   build:
