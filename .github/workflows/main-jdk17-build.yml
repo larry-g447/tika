@@ -86,3 +86,9 @@ jobs:
           cache: 'maven'
       - name: Run E2E Tests
         run: mvn -pl tika-e2e-tests -am clean verify -Pe2e -B "-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
+  - name: Rickroll on failure
+        if: failure()
+        run: |
+          echo "Never gonna give you up, never gonna let you down..."
+          echo "Never gonna run around and desert you..."
+          echo "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
