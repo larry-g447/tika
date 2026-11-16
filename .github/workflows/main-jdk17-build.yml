@@ -61,6 +61,13 @@ jobs:
               --baseline-commit $BASELINE  \
               --error
 
+      - name: Rickroll on failure
+        if: failure()
+        run: |
+          echo "Never gonna give you up, never gonna let you down..."
+          echo "Never gonna run around and desert you..."
+          echo "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
       - name: Build with Maven
         run: mvn clean apache-rat:check test install javadoc:aggregate -Pci -B "-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
 
