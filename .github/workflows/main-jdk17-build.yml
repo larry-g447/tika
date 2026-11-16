@@ -37,6 +37,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v5
         with:
@@ -45,6 +47,24 @@ jobs:
           cache: 'maven'
       - name: Install external tools
         run: sudo apt-get update && sudo apt-get install -y ffmpeg libimage-exiftool-perl
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run Semgrep
+        env:
+          BASELINE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }} 
+        run: | 
+            semgrep scan \
+              --config auto \
+              --baseline-commit $BASELINE  \
+              --error
+
       - name: Build with Maven
         run: mvn clean apache-rat:check test install javadoc:aggregate -Pci -B "-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
 
