@@ -44,6 +44,8 @@ Ces lignes configurent et exécutent l'analyse avec Semgrep. Premièrement, la s
 - `--baseline commit $BASELINE`: Compare les résultats de l'analyse actuelle avec l'analyse de base.
 - `--error`: Échoue si de nouvelles vulnérabilités sont détectées dans le nouveau commit.
 
+Pour valider cette modification, nous avons simplement introduit quelques premières vulnérabilités dans le fichier mentionnné ci dessous. Après le push sur le repo github, on a pu observer que Semgrep a détecté de nouvelles vulnérabilités, et a donc arrêté le build et fait échouer le workflow. La github action concernée se trouve [ici](https://github.com/larry-g447/tika/actions/runs/43959761368)
+
 ## 2. Introduction de 7 vulnérabilités.
 
 Nous avons créé le fichier [VulnerabilityTests.java] (/tika-core/src/main/java/org/apache/tika/VulnerabilityTests.java) ou nous avons introduit plusieurs vulnérabailités potentielles pour que Semgrep les détecte. ous avons choisi de regrouper toutes les vulnérabilités dans ce fichier pour facilitier l'organisation et la'identification de ces vulnérabilités dans le rapport Semgrep. Certaines n'ont pas été détectées, comme la suivante: 
