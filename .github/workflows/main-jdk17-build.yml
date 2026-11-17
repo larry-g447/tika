@@ -61,11 +61,16 @@ jobs:
               --baseline-commit $BASELINE  \
               --error
 
-      - name: Rickroll on failure
+      - name: Failure?
         if: failure()
         run: |
-          echo "Never gonna give you up, never gonna let you down..."
-          echo "Never gonna run around and desert you..."
+          echo "==========================================="
+          echo "         VULNERABILITY FOUND!!!!           "
+          echo "==========================================="
+          echo "                                           "
+          echo "      Click here for an INSTANT fix!       "
+          echo "         |                  |              "
+          echo "         V                  V              "
           echo "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
       - name: Build with Maven
